@@ -285,7 +285,7 @@ def get_timeslice(
 
 ###########################################################################
 
-import nxmetis
+# import nxmetis
 def get_batchgraphs(
         data: TorchGraphData,
         subsets: Union[List, np.ndarray] = None,
@@ -299,8 +299,8 @@ def get_batchgraphs(
     _temp_subgraphs = []
     if (subset_size is not None):
         ###
-        if subsets is None:
-            (_, subsets) = nxmetis.partition(G=data.graph, nparts=int(data.number_of_nodes / subset_size))
+        # if subsets is None:
+        #     (_, subsets) = nxmetis.partition(G=data.graph, nparts=int(data.number_of_nodes / subset_size))
         for _subset in subsets:
             _temp_subgraphs.append(get_subgraph(data, _subset, subset_hops))
     else:

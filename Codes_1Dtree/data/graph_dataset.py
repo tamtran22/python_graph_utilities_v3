@@ -179,15 +179,25 @@ class OneDDatasetLoader(Dataset):
     def process(self):
         pass
 
-    def load_scaler(self, variable):
+    def load_scaler(self, variable, index=None):
         if not os.path.isdir(f'{self.root}/scaler'):
             return None
-        _scaler_file = open(f'{self.root}/scaler/{variable}.pkl','rb')
+        if index is None:
+            _scaler_file = open(f'{self.root}/scaler/{variable}.pkl','rb')
+        else:
+            _scaler_file = open(f'{self.root}/scaler/{variable}_{index}.pkl','rb')
         _scaler = pickle.load(_scaler_file)
         _scaler_file.close()
         return _scaler
 
 ################################################################################
+def resolve_scaler(scaler_type, **kwargs):
+    if scaler_type == 'minmax_scaler':
+        return MinMaxScaler(**kwargs)
+    if scaler_type == 'standard_scaler':
+        return StandardScaler()
+    if scaler_type == 'robust_scaler':
+        return RobustScaler()
 
 def normalize(
         dataset: Union[OneDDatasetBuilder, OneDDatasetLoader],
@@ -209,6 +219,11 @@ def normalize(
         return dataset
     ##
     for _variable in scaler_dict:
+        ### 
+        # check if variable is normalized per subject or whole dataset
+        if 'per_subject' in scaler_dict[_variable][0]:
+            continue
+        ###
         _variable_data = []
         for i in range(dataset.len()):
             _variable_data.append(dataset[i]._store[_variable])
@@ -221,32 +236,37 @@ def normalize(
             if isinstance(scaler_dict[_variable][2], float):
                 _min = np.quantile(_variable_data.numpy(), q=1.-scaler_dict[_variable][2])
                 _max = np.quantile(_variable_data.numpy(), q=scaler_dict[_variable][2])
-                # _min = torch.quantile(_variable_data, q=1.-scaler_dict[_variable][2], dim=None, keepdim=True)
-                # _max = torch.quantile(_variable_data, q=scaler_dict[_variable][2], dim=None, keepdim=True)
             else:
                 (_min, _max) = scaler_dict[_variable][2]
             _variable_data = torch.clip(_variable_data, _min, _max)
         ###
-        if scaler_dict[_variable][0] == 'minmax_scaler':
-            _scaler = MinMaxScaler(feature_range=(-1.,1.))
-            _scaler.fit(_variable_data)
-            _scaler_file = open(f'{dataset.root}/scaler/{_variable}.pkl','wb')
-            pickle.dump(_scaler, _scaler_file)
-            _scaler_file.close()
-        ###
-        if scaler_dict[_variable][0] == 'standard_scaler':
-            _scaler = StandardScaler()
-            _scaler.fit(_variable_data)
-            _scaler_file = open(f'{dataset.root}/scaler/{_variable}.pkl','wb')
-            pickle.dump(_scaler, _scaler_file)
-            _scaler_file.close()
-        ###
-        if scaler_dict[_variable][0] == 'robust_scaler':
-            _scaler = RobustScaler()
-            _scaler.fit(_variable_data)
-            _scaler_file = open(f'{dataset.root}/scaler/{_variable}.pkl','wb')
-            pickle.dump(_scaler, _scaler_file)
-            _scaler_file.close()
+        _scaler_type = scaler_dict[_variable][0].replace('_per_subject','')
+        _scaler = resolve_scaler(_scaler_type, feature_range=(-1.,1.))
+        _scaler.fit(_variable_data)
+        _scaler_file = open(f'{dataset.root}/scaler/{_variable}.pkl','wb')
+        pickle.dump(_scaler, _scaler_file)
+        _scaler_file.close()
+        # ###
+        # if scaler_dict[_variable][0] == 'minmax_scaler':
+        #     _scaler = MinMaxScaler(feature_range=(-1.,1.))
+        #     _scaler.fit(_variable_data)
+        #     _scaler_file = open(f'{dataset.root}/scaler/{_variable}.pkl','wb')
+        #     pickle.dump(_scaler, _scaler_file)
+        #     _scaler_file.close()
+        # ###
+        # if scaler_dict[_variable][0] == 'standard_scaler':
+        #     _scaler = StandardScaler()
+        #     _scaler.fit(_variable_data)
+        #     _scaler_file = open(f'{dataset.root}/scaler/{_variable}.pkl','wb')
+        #     pickle.dump(_scaler, _scaler_file)
+        #     _scaler_file.close()
+        # ###
+        # if scaler_dict[_variable][0] == 'robust_scaler':
+        #     _scaler = RobustScaler()
+        #     _scaler.fit(_variable_data)
+        #     _scaler_file = open(f'{dataset.root}/scaler/{_variable}.pkl','wb')
+        #     pickle.dump(_scaler, _scaler_file)
+        #     _scaler_file.close()
     ##
     for i in range(dataset.len()):
         _data = dataset[i]
@@ -263,12 +283,19 @@ def normalize(
                     if isinstance(scaler_dict[_variable][2], float):
                         _min = np.quantile(_variable_data.numpy(), q=1.-scaler_dict[_variable][2])
                         _max = np.quantile(_variable_data.numpy(), q=scaler_dict[_variable][2])
-                        # _min = torch.quantile(_variable_data, q=1.-scaler_dict[_variable][2], dim=None, keepdim=True)
-                        # _max = torch.quantile(_variable_data, q=scaler_dict[_variable][2], dim=None, keepdim=True)
                     else:
                         (_min, _max) = scaler_dict[_variable][2]
                     _variable_data = torch.clip(_variable_data, _min, _max)
-                _variable_data = torch.tensor(dataset.load_scaler(_variable).transform(_variable_data))
+                if 'per_subject' in scaler_dict[_variable][0]:
+                    _scaler_type = scaler_dict[_variable][0].replace('_per_subject','')
+                    _scaler = resolve_scaler(_scaler_type, feature_range=(-1.,1.))
+                    _scaler.fit(_variable_data)
+                    _scaler_file = open(f'{dataset.root}/scaler/{_variable}_{i}.pkl','wb')
+                    pickle.dump(_scaler, _scaler_file)
+                    _scaler_file.close()
+                else:
+                    _scaler = dataset.load_scaler(_variable)
+                _variable_data = torch.tensor(_scaler.transform(_variable_data))
                 _variable_data = torch.reshape(_variable_data, _resize)
             else:
                 _variable_data = _data._store[_variable]
@@ -280,52 +307,52 @@ def normalize(
 
 ##########################################################################
 
-def batchgraph_generation_wise(
-        dataset: Union[OneDDatasetBuilder, OneDDatasetLoader],
-        sub_dir: str = 'batched',
-        batch_gens: List[Tuple] = [[0,9],[10,13], [14, 15], [16, 18], [18,50]],
-        timestep: int = None,
-        timeslice_hops: int = 1,
-        timeslice_steps=1
-) -> OneDDatasetLoader:
-    ##
-    if sub_dir == '' or sub_dir == '/':
-        print('Unable to clear root folder!')
-    else:
-        os.system(f'rm -rf {dataset.root}/{sub_dir}')
-    os.system(f'mkdir {dataset.root}/{sub_dir}')
-    if dataset.len() <= 0:
-        return dataset
-    ##
-    _batched_dataset = []
-    _batched_dataset_id = []
-    for i in range(dataset.len()):
-        ###
-        if dataset.sub == 'processed':
-            _gen = dataset[i].node_attr[:,5].type(torch.LongTensor)
-        else:
-            _scaler = dataset.load_scaler('node_attr')
-            _node_attr = _scaler.inverse_transform(dataset[i].node_attr)
-            _gen = _node_attr[:,5].astype(np.int32)
-        _batch_gens = [list(range(batch_gens[i][0], batch_gens[i][1])) for i in range(len(batch_gens))]
-        _subsets = [list(np.where(np.isin(_gen, _batch_gens[i]))[0]) for i in range(len(batch_gens))]
-        ###
-        _subgraphs = get_batchgraphs(
-            data=dataset[i],
-            subsets=_subsets,
-            subset_size=1,
-            subset_hops=1,
-            timestep=timestep,
-            timeslice_hops=timeslice_hops,
-            timeslice_steps=timeslice_steps
-        )
-        _batched_dataset += _subgraphs
-        _batched_dataset_id += [i]*len(_subgraphs)
-    ##
-    for i in range(len(_batched_dataset)):
-        torch.save(_batched_dataset[i], f'{dataset.root}/{sub_dir}/subgraph_{i}.pt')
-    torch.save(torch.tensor(_batched_dataset_id), f'{dataset.root}/{sub_dir}/batched_id.pt')
-    return OneDDatasetLoader(root_dir=dataset.root, sub_dir=sub_dir)
+# def batchgraph_generation_wise(
+#         dataset: Union[OneDDatasetBuilder, OneDDatasetLoader],
+#         sub_dir: str = 'batched',
+#         batch_gens: List[Tuple] = [[0,9],[10,13], [14, 15], [16, 18], [18,50]],
+#         timestep: int = None,
+#         timeslice_hops: int = 1,
+#         timeslice_steps=1
+# ) -> OneDDatasetLoader:
+#     ##
+#     if sub_dir == '' or sub_dir == '/':
+#         print('Unable to clear root folder!')
+#     else:
+#         os.system(f'rm -rf {dataset.root}/{sub_dir}')
+#     os.system(f'mkdir {dataset.root}/{sub_dir}')
+#     if dataset.len() <= 0:
+#         return dataset
+#     ##
+#     _batched_dataset = []
+#     _batched_dataset_id = []
+#     for i in range(dataset.len()):
+#         ###
+#         if dataset.sub == 'processed':
+#             _gen = dataset[i].node_attr[:,5].type(torch.LongTensor)
+#         else:
+#             _scaler = dataset.load_scaler('node_attr')
+#             _node_attr = _scaler.inverse_transform(dataset[i].node_attr)
+#             _gen = _node_attr[:,5].astype(np.int32)
+#         _batch_gens = [list(range(batch_gens[i][0], batch_gens[i][1])) for i in range(len(batch_gens))]
+#         _subsets = [list(np.where(np.isin(_gen, _batch_gens[i]))[0]) for i in range(len(batch_gens))]
+#         ###
+#         _subgraphs = get_batchgraphs(
+#             data=dataset[i],
+#             subsets=_subsets,
+#             subset_size=1,
+#             subset_hops=1,
+#             timestep=timestep,
+#             timeslice_hops=timeslice_hops,
+#             timeslice_steps=timeslice_steps
+#         )
+#         _batched_dataset += _subgraphs
+#         _batched_dataset_id += [i]*len(_subgraphs)
+#     ##
+#     for i in range(len(_batched_dataset)):
+#         torch.save(_batched_dataset[i], f'{dataset.root}/{sub_dir}/subgraph_{i}.pt')
+#     torch.save(torch.tensor(_batched_dataset_id), f'{dataset.root}/{sub_dir}/batched_id.pt')
+#     return OneDDatasetLoader(root_dir=dataset.root, sub_dir=sub_dir)
 
 #############################################################################
 
@@ -370,24 +397,21 @@ def batchgraph(
 
 ##############################################################################
 
-def dataset_to_loader(
-    dataset : Dataset,
-    data_subset_dict = {
-        'train': [],
-        'test': [],
-        'validation': []
-    },
-    n_data_per_batch = 1
-):
-    # Get batching id
-    if 'batched' in dataset.sub:
-        _batching_id = torch.load(f'{dataset.root}/{dataset.sub}/batched_id.pt').numpy()
-        for _data_subset in data_subset_dict:
-            data_subset_dict[_data_subset] = list(np.where(np.isin(_batching_id, data_subset_dict[_data_subset] ) == True)[0])
-    _data_subsets = []
-    for _data_subset in data_subset_dict:
-        _data_subsets.append(DataLoader([dataset[i] for i in data_subset_dict[_data_subset]], batch_size=n_data_per_batch))
-    return tuple(_data_subsets)
-    # train_set = [dataset[i] for i in data_subset_dict['train']]
-    # test_set = [dataset[i] for i in data_subset_dict['test']]
-    # return train_set, test_set
+# def dataset_to_loader(
+#     dataset : Dataset,
+#     data_subset_dict = {
+#         'train': [],
+#         'test': [],
+#         'validation': []
+#     },
+#     n_data_per_batch = 1
+# ):
+#     # Get batching id
+#     if 'batched' in dataset.sub:
+#         _batching_id = torch.load(f'{dataset.root}/{dataset.sub}/batched_id.pt').numpy()
+#         for _data_subset in data_subset_dict:
+#             data_subset_dict[_data_subset] = list(np.where(np.isin(_batching_id, data_subset_dict[_data_subset] ) == True)[0])
+#     _data_subsets = []
+#     for _data_subset in data_subset_dict:
+#         _data_subsets.append(DataLoader([dataset[i] for i in data_subset_dict[_data_subset]], batch_size=n_data_per_batch))
+#     return tuple(_data_subsets)

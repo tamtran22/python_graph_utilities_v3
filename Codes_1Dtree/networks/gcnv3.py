@@ -95,7 +95,7 @@ class GraphUNet(nn.Module):
         depth: int,
         sum_res: bool = True,
         act: Union[str, Callable] = 'relu',
-        block_depth: int = 2,
+        block_depth: int = 1,
         dropout: float = None,
         *args, **kwargs
     ) -> None:
@@ -167,7 +167,7 @@ class RecurrentFormulationNet(nn.Module):
             hidden_channels=hidden_size,
             out_channels=latent_size,
             depth=3,
-            block_depth=2,
+            block_depth=1,
             sum_res=False,
             act=act,
             dropout=dropout
@@ -178,7 +178,7 @@ class RecurrentFormulationNet(nn.Module):
             hidden_channels=hidden_size,
             out_channels=hidden_size,
             depth=3,
-            block_depth=2,
+            block_depth=1,
             sum_res=False,
             act=act,
             dropout=dropout
@@ -186,25 +186,25 @@ class RecurrentFormulationNet(nn.Module):
 
         self.differentiator2 = nn.Linear(hidden_size, n_field)
 
-        self.integrator = gnn.MLP(
-            in_channels=n_field*2,
-            hidden_channels=hidden_size,
-            out_channels=n_field,
-            num_layers=2,
-            act=act
-        )
+        # self.integrator = gnn.MLP(
+        #     in_channels=n_field*2,
+        #     hidden_channels=hidden_size,
+        #     out_channels=n_field,
+        #     num_layers=5,
+        #     act=act
+        # )
     
     def forward(self, F_0, edge_index, meshfield, time=None, n_time=1, device=None):
         ##
         meshfield = self.mesh_decriptor(meshfield, edge_index)
         meshfield = F.tanh(meshfield)
         # print(meshfield)
+        dt = 4.0/200
         ##
         F_dots, Fs = [], []
         F_current = F_0
         F_hidden = torch.zeros((F_0.size(0), self.hidden_size)).float().to(device)
         for i in range(n_time):
-            # print(i)
             if time is None:
                 x = torch.cat([F_current, meshfield], dim=1)
             else:
@@ -215,10 +215,10 @@ class RecurrentFormulationNet(nn.Module):
             F_hidden = self.act(self.differentiator1(x, edge_index))
             F_dot_current = F.tanh(self.differentiator2(F_hidden))
 
-            x = torch.cat([F_current, F_dot_current], dim=-1)
-            F_next = self.integrator(x, edge_index)
-            F_next = F.tanh(F_next)
-            # print(F_next)
+            # x = torch.cat([F_current, F_dot_current], dim=-1)
+            # F_next = self.integrator(x, edge_index)
+            # F_next = F.tanh(F_next)
+            F_next = F.tanh(F_current + F_dot_current*dt)
 
             Fs.append(F_next.unsqueeze(1))
             F_dots.append(F_dot_current.unsqueeze(1))
