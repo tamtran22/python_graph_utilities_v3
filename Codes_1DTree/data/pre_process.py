@@ -160,3 +160,24 @@ def batchgraph_generation_wise(
         torch.save(_batched_dataset[i], f'{dataset.root}/{sub_dir}/subgraph_{i}.pt')
     torch.save(torch.tensor(_batched_dataset_id), f'{dataset.root}/{sub_dir}/batched_id.pt')
     return OneDDatasetLoader(root_dir=dataset.root, sub_dir=sub_dir)
+
+##############################################################################
+
+def dataset_to_loader(
+    dataset : Dataset,
+    data_subset_dict = {
+        'train': [],
+        'test': [],
+        'validation': []
+    },
+    n_data_per_batch = 1
+):
+    # Get batching id
+    if 'batched' in dataset.sub:
+        _batching_id = torch.load(f'{dataset.root}/{dataset.sub}/batched_id.pt').numpy()
+        for _data_subset in data_subset_dict:
+            data_subset_dict[_data_subset] = list(np.where(np.isin(_batching_id, data_subset_dict[_data_subset] ) == True)[0])
+    _data_subsets = []
+    for _data_subset in data_subset_dict:
+        _data_subsets.append(DataLoader([dataset[i] for i in data_subset_dict[_data_subset]], batch_size=n_data_per_batch))
+    return tuple(_data_subsets)
