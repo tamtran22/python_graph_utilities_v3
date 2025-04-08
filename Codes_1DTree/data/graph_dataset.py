@@ -107,8 +107,8 @@ class OneDDatasetBuilder(Dataset):
                 np.expand_dims(data_dict['length'], axis=1),
                 np.expand_dims(data_dict['diameter'], axis=1),
                 np.expand_dims(data_dict['generation'], axis=1),
-                data_dict['lobe'],
-                data_dict['flag']
+                np.expand_dims(data_dict['lobe'], axis=1),
+                np.expand_dims(data_dict['flag'], axis=1)
             ], axis=1)).type(self.data_type)
 
             global_attr = torch.tensor(np.concatenate([
@@ -117,7 +117,6 @@ class OneDDatasetBuilder(Dataset):
 
             pressure_attr = torch.tensor(data_dict['pressure']).type(self.data_type)
             reference_pressure = pressure_attr[0][0].item()
-            print(reference_pressure)
             pressure_attr -= reference_pressure
 
             flowrate_attr = torch.tensor(data_dict['flowrate']).type(self.data_type)
@@ -179,10 +178,15 @@ class OneDDatasetLoader(Dataset):
         self.time_names = time_names
 
     def processed_file_names(self):
-        return [f'{self.root}/{self.sub}/{subject}.pt' for subject in self.subjects]
+        processed_file_names =  os.listdir(f'{self.root}/{self.sub}/')
+        # print(processed_file_names)
+        # reduced_processed_file_names = [file_name.replace(self.root,'').replace(self.sub,'').replace('/','') for file_name in processed_file_names]
+        # print(reduced_processed_file_names)
+        processed_file_names = [f'{self.root}/{self.sub}/{file_name}' for file_name in processed_file_names]
+        return processed_file_names
 
     def len(self):
-        return len(self.subjects)
+        return len(self.processed_file_names())
 
     def __getitem__(self, index):
         return torch.load(self.processed_file_names()[index])

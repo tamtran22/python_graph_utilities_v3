@@ -162,6 +162,48 @@ def batchgraph_generation_wise(
     return OneDDatasetLoader(root_dir=dataset.root, sub_dir=sub_dir)
 
 ##############################################################################
+def batchgraph_edgewise(
+    dataset: Union[OneDDatasetBuilder, OneDDatasetLoader],
+    sub_dir: str = 'batched',
+    batch_gens: List[Tuple] = [[0,9],[10,13], [14, 15], [16, 18], [18,50]],
+    subset_hops: int = 1,
+    timestep: int = None,
+    timeslice_hops: int = 1,
+    timeslice_steps=1
+) -> OneDDatasetLoader:
+    ##
+    if sub_dir == '' or sub_dir == '/':
+        print('Unable to clear root folder!')
+    else:
+        os.system(f'rm -rf {dataset.root}/{sub_dir}')
+    os.system(f'mkdir {dataset.root}/{sub_dir}')
+    if dataset.len() <= 0:
+        return dataset
+    ##
+    # _batched_dataset_id = []
+    for i in range(dataset.len()):
+        ###
+        # create _subsets
+        _subsets = np.transpose(dataset[i].edge_index.numpy()).tolist()
+        ###
+        _subgraphs = get_batchgraphs(
+            data=dataset[i],
+            subsets=_subsets,
+            subset_size=1,
+            subset_hops=subset_hops,
+            timestep=timestep,
+            timeslice_hops=timeslice_hops,
+            timeslice_steps=timeslice_steps
+        )
+        subject = dataset.subjects[i]
+        for j in range(len(_subgraphs)):
+            torch.save(_subgraphs[j], f'{dataset.root}/{sub_dir}/{subject}_{j}.pt')
+        # _batched_dataset_id += [i]*len(_subgraphs)
+    ##
+    # torch.save(torch.tensor(_batched_dataset_id), f'{dataset.root}/{sub_dir}/batched_id.pt')
+    return OneDDatasetLoader(root_dir=dataset.root, sub_dir=sub_dir)
+
+##############################################################################
 
 def dataset_to_loader(
     dataset : Dataset,

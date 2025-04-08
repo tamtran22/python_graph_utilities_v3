@@ -24,7 +24,7 @@ class LpLoss(object):
             else:
                 return torch.sum(diff_norms/y_norms)
 
-        return diff_norms/y_norms
+        return diff_norms
 
     def __call__(self, x, y):
         return self.rel(x, y)

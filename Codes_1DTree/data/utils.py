@@ -256,7 +256,8 @@ def refine_1Dmesh(
 
             for attr in edge_attr:
                 if attr in ['flag']:
-                    assign_value = np.array([0, 0, 0, 0, 0, 1])
+                    # assign_value = np.array([0, 0, 0, 0, 0, 1])
+                    assign_value = 5
                 elif attr in ['length']:
                     assign_value = abs_delta
                 else:
@@ -301,28 +302,37 @@ def edge_to_node(
 
 #######################################################
 def process_lobe(lobe: np.ndarray):
-    encode_lobe = {
-        0 : np.array([[1, 0, 0, 0, 0, 0]]),
-        1 : np.array([[0, 1, 0, 0, 0, 0]]),
-        2 : np.array([[0, 0, 1, 0, 0, 0]]),
-        3 : np.array([[0, 0, 0, 1, 0, 0]]),
-        4 : np.array([[0, 0, 0, 0, 1, 0]]),
-        5 : np.array([[0, 0, 0, 0, 0, 1]]),
-    }
-    output = [encode_lobe[lobe[i]] for i in range(lobe.shape[0])]
-    return np.concatenate(output, axis=0)
+    return lobe
+    # encode_lobe = {
+    #     0 : np.array([[1, 0, 0, 0, 0, 0]]),
+    #     1 : np.array([[0, 1, 0, 0, 0, 0]]),
+    #     2 : np.array([[0, 0, 1, 0, 0, 0]]),
+    #     3 : np.array([[0, 0, 0, 1, 0, 0]]),
+    #     4 : np.array([[0, 0, 0, 0, 1, 0]]),
+    #     5 : np.array([[0, 0, 0, 0, 0, 1]]),
+    # }
+    # output = [encode_lobe[lobe[i]] for i in range(lobe.shape[0])]
+    # return np.concatenate(output, axis=0)
 
 #######################################################
 def process_flag(flag: np.ndarray):
+    # encode_flag = {
+    #     'C' : np.array([[1, 0, 0, 0, 0, 0]]),
+    #     'P' : np.array([[0, 1, 0, 0, 0, 0]]),
+    #     'E' : np.array([[0, 0, 1, 0, 0, 0]]),
+    #     'G' : np.array([[0, 0, 0, 1, 0, 0]]),
+    #     'T' : np.array([[0, 0, 0, 0, 1, 0]]),
+    # }
     encode_flag = {
-        'C' : np.array([[1, 0, 0, 0, 0, 0]]),
-        'P' : np.array([[0, 1, 0, 0, 0, 0]]),
-        'E' : np.array([[0, 0, 1, 0, 0, 0]]),
-        'G' : np.array([[0, 0, 0, 1, 0, 0]]),
-        'T' : np.array([[0, 0, 0, 0, 1, 0]]),
+        'C' : 0,
+        'P' : 1,
+        'E' : 2,
+        'G' : 3,
+        'T' : 4,
     }
     output = [encode_flag[flag[i]] for i in range(flag.shape[0])]
-    return np.concatenate(output, axis=0)
+    # return np.concatenate(output, axis=0)
+    return np.array(output, dtype=np.int32)
 
 ######################################################
 def distance(A, B):
