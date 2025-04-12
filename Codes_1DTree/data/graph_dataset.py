@@ -179,9 +179,10 @@ class OneDDatasetLoader(Dataset):
 
     def processed_file_names(self):
         processed_file_names =  os.listdir(f'{self.root}/{self.sub}/')
-        # print(processed_file_names)
-        # reduced_processed_file_names = [file_name.replace(self.root,'').replace(self.sub,'').replace('/','') for file_name in processed_file_names]
-        # print(reduced_processed_file_names)
+        _filename_filter = lambda s : not s in [
+                'pre_filter.pt', 'pre_transform.pt', 'batched_id.pt', 'batched_info.pt'
+            ]
+        processed_file_names = list(filter(_filename_filter, processed_file_names))
         processed_file_names = [f'{self.root}/{self.sub}/{file_name}' for file_name in processed_file_names]
         return processed_file_names
 
@@ -189,7 +190,7 @@ class OneDDatasetLoader(Dataset):
         return len(self.processed_file_names())
 
     def __getitem__(self, index):
-        return torch.load(self.processed_file_names()[index])
+        return torch.load(self.processed_file_names()[index], weights_only=False)
 
     def get(self, index):
             return torch.load(self.processed_file_names()[index])
